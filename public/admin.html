@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin – offmarketimmobilien24.de</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  table{width:100%;border-collapse:collapse;font-size:.9rem;background:var(--paper);border:1px solid var(--line-light);border-radius:var(--r-lg);overflow:hidden}
+  th,td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line-light);vertical-align:top}
+  th{background:var(--night);color:var(--ivory);font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--ivory)}
+  td .mono{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--copper)}
+  select.st{padding:8px 10px;border:1px solid var(--line-light);border-radius:var(--r);font-family:'Inter';background:var(--ivory);font-size:.86rem}
+  td small{color:var(--muted-on-light)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap head-in">
+    <a href="/" class="brand">
+      <svg class="seal-mark" viewBox="0 0 64 64"><defs><radialGradient id="w1" cx="38%" cy="34%" r="72%"><stop offset="0%" stop-color="#ffc24d"/><stop offset="55%" stop-color="#e0a32e"/><stop offset="100%" stop-color="#b8791f"/></radialGradient></defs><rect width="64" height="64" rx="13" fill="#0b1626"/><path d="M32 11c5 0 7-2 10 1c3 2 2 5 4 7c2 3 5 3 5 7c0 4-3 5-4 8c-1 3 0 6-3 8c-3 2-6 0-9 1c-3 1-4 3-7 3c-4 0-5-3-8-4c-3-1-6 0-8-3c-2-3 0-6-1-9c-1-3-4-4-4-8c0-4 3-5 4-8c1-3 0-6 3-8c3-2 6 0 9-1c3-1 4-2 9-1z" fill="url(#w1)"/><path d="M22 36 L32 25 L42 36 L42 37.5 L38 37.5 L38 44 L26 44 L26 37.5 L22 37.5 Z" fill="#0b1626" opacity=".82"/></svg>
+      <span class="wordmark">offmarket<span class="num">24</span> <span class="tld" style="font-size:.85rem">· Admin</span></span>
+    </a>
+    <nav class="nav"><a class="btn ghost" href="/portal.html">Mitgliederbereich</a></nav>
+  </div>
+</header>
+
+<section class="section tight">
+  <div class="wrap">
+    <div class="auth-box" id="gate" style="margin:20px auto;box-shadow:var(--shadow-soft)">
+      <div class="file-no">Zutritt · Verwaltung</div>
+      <h1 style="font-size:1.5rem">Admin-Zugang</h1>
+      <p class="lead">Bitte Admin-Schlüssel eingeben.</p>
+      <div class="field"><label>Schlüssel</label><input type="password" id="adminKey" placeholder="Admin-Schlüssel"></div>
+      <button class="btn block" id="enterBtn">Register laden</button>
+      <div class="msg" id="gateMsg"></div>
+    </div>
+
+    <div id="panel" style="display:none">
+      <div class="sec-head" style="margin-bottom:30px">
+        <span class="label">Verwaltung</span>
+        <h2 style="font-size:2rem">Objekte im Register</h2>
+        <p>Neue Akten auf „sichtbar" stellen, damit Mitglieder sie einsehen können.</p>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Akte</th><th>Art</th><th>Lage</th><th>Fläche</th><th>Eigentümer (intern)</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="/config.js"></script>
+<script>
+let KEY=sessionStorage.getItem('omi_admin')||'';
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fileNo(p){const y=new Date((p.created_at||0)*1000).getFullYear()||2026;return 'OM-'+y+'-'+String(p.id).padStart(3,'0');}
+document.getElementById('enterBtn').onclick=()=>{KEY=document.getElementById('adminKey').value.trim();sessionStorage.setItem('omi_admin',KEY);load();};
+async function load(){
+  const gm=document.getElementById('gateMsg');
+  try{
+    const r=await fetch(API_BASE+'/api/admin/properties?key='+encodeURIComponent(KEY));
+    if(!r.ok)throw new Error();
+    const d=await r.json();
+    document.getElementById('gate').style.display='none';
+    document.getElementById('panel').style.display='block';
+    render(d.properties||[]);
+  }catch(e){gm.className='msg err';gm.textContent='Falscher Schlüssel oder Serverfehler.';}
+}
+function render(props){
+  const rows=document.getElementById('rows'),opts=['neu','sichtbar','reserviert','verkauft'];
+  rows.innerHTML=props.map(p=>`<tr>
+    <td><span class="mono">${fileNo(p)}</span></td>
+    <td>${esc(p.immobilienart||'')}${p.hausart?'<br><small>'+esc(p.hausart)+'</small>':''}</td>
+    <td>${esc(p.plz||'')} ${esc(p.stadt||'')}<br><small>${esc(p.strasse||'')}</small></td>
+    <td>${p.wohnflaeche?p.wohnflaeche+' m²':'–'}</td>
+    <td><small>${esc(p.kunde_name||'–')}<br>${esc(p.kunde_telefon||'')}<br>${esc(p.kunde_email||'')}</small></td>
+    <td><select class="st" data-id="${p.id}">${opts.map(o=>`<option value="${o}" ${p.status===o?'selected':''}>${o}</option>`).join('')}</select></td>
+  </tr>`).join('');
+  rows.querySelectorAll('select.st').forEach(sel=>{
+    sel.onchange=async()=>{sel.disabled=true;await fetch(API_BASE+'/api/admin/set-status?key='+encodeURIComponent(KEY),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:Number(sel.dataset.id),status:sel.value})});sel.disabled=false;};
+  });
+}
+if(KEY)load();
+</script>
+</body>
+</html>

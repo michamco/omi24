@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mitgliederbereich – offmarketimmobilien24.de</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="wrap head-in">
+    <a href="/" class="brand">
+      <svg class="seal-mark" viewBox="0 0 64 64"><defs><radialGradient id="w1" cx="38%" cy="34%" r="72%"><stop offset="0%" stop-color="#ffc24d"/><stop offset="55%" stop-color="#e0a32e"/><stop offset="100%" stop-color="#b8791f"/></radialGradient></defs><rect width="64" height="64" rx="13" fill="#0b1626"/><path d="M32 11c5 0 7-2 10 1c3 2 2 5 4 7c2 3 5 3 5 7c0 4-3 5-4 8c-1 3 0 6-3 8c-3 2-6 0-9 1c-3 1-4 3-7 3c-4 0-5-3-8-4c-3-1-6 0-8-3c-2-3 0-6-1-9c-1-3-4-4-4-8c0-4 3-5 4-8c1-3 0-6 3-8c3-2 6 0 9-1c3-1 4-2 9-1z" fill="url(#w1)"/><path d="M22 36 L32 25 L42 36 L42 37.5 L38 37.5 L38 44 L26 44 L26 37.5 L22 37.5 Z" fill="#0b1626" opacity=".82"/></svg>
+      <span class="wordmark">offmarket<span class="num">immobilien24</span><span class="tld">.de</span></span>
+    </a>
+    <nav class="nav">
+      <a class="link" id="portalLink" style="cursor:pointer">Abo verwalten</a>
+      <a class="btn ghost" id="logoutBtn" style="cursor:pointer">Abmelden</a>
+    </nav>
+  </div>
+</header>
+
+<section class="section tight">
+  <div class="wrap">
+    <div id="loading"><div class="spinner"></div></div>
+
+    <div id="content" style="display:none">
+      <div class="statusbar">
+        <div class="who">Angemeldet als <b id="userEmail"></b></div>
+        <span class="pill" id="statusPill"></span>
+      </div>
+
+      <div id="inactiveBox" style="display:none">
+        <div class="empty">
+          <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+          <h2>Ihr Zugang ist nicht aktiv</h2>
+          <p style="margin-bottom:24px">Aktivieren Sie Ihre Mitgliedschaft, um Einsicht in alle Off-Market-Objekte zu erhalten.</p>
+          <a href="/#zugang" class="btn">Mitgliedschaft aktivieren <span class="arr">→</span></a>
+        </div>
+      </div>
+
+      <div id="activeBox" style="display:none">
+        <div class="sec-head" style="margin-bottom:34px">
+          <span class="label">Aktuelles Register</span>
+          <h2 style="font-size:2.1rem">Off-Market-Objekte</h2>
+          <p>Diese Objekte sind nicht öffentlich inseriert. Bei Interesse fordern Sie die Kontaktfreigabe an.</p>
+        </div>
+        <div class="cards" id="cards"></div>
+        <div class="empty" id="noProps" style="display:none">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg>
+          <p>Aktuell sind keine Objekte im Register. Neue Akten werden laufend ergänzt — schauen Sie bald wieder vorbei.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="modal" id="modal-kontakt"><div class="modal-box" style="max-width:480px"><button class="modal-close" onclick="closeKontakt()">&times;</button>
+  <h2>Kontaktfreigabe anfordern</h2>
+  <p>Sie fordern die Freigabe der Eigentümer-Kontaktdaten für dieses Objekt an. Wir prüfen Ihre Anfrage und melden uns zeitnah bei Ihnen.</p>
+  <div class="msg" id="kontaktMsg"></div>
+  <button class="btn block" id="kontaktConfirm" style="margin-top:16px">Anfrage absenden <span class="arr">→</span></button>
+</div></div>
+
+<script src="/config.js"></script>
+<script>
+let currentProp=null;
+async function api(path,opts={}){return await fetch(API_BASE+path,{credentials:'include',...opts});}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fileNo(p){const y=new Date((p.created_at||0)*1000).getFullYear()||2026;return 'OM-'+y+'-'+String(p.id).padStart(3,'0');}
+
+async function init(){
+  let me;
+  try{me=await (await api('/api/me')).json();}catch(e){location.href='/login.html';return;}
+  if(!me.loggedIn){location.href='/login.html';return;}
+  document.getElementById('loading').style.display='none';
+  document.getElementById('content').style.display='block';
+  document.getElementById('userEmail').textContent=me.email;
+  const pill=document.getElementById('statusPill');
+  if(me.active){pill.className='pill active';pill.textContent='Zugang aktiv';document.getElementById('activeBox').style.display='block';loadProperties();}
+  else{pill.className='pill inactive';pill.textContent='Nicht aktiv';document.getElementById('inactiveBox').style.display='block';}
+}
+
+async function loadProperties(){
+  const cards=document.getElementById('cards');
+  try{
+    const r=await api('/api/properties');
+    if(r.status===402){document.getElementById('inactiveBox').style.display='block';document.getElementById('activeBox').style.display='none';return;}
+    const d=await r.json();const props=d.properties||[];
+    if(!props.length){document.getElementById('noProps').style.display='block';return;}
+    cards.innerHTML=props.map(p=>{
+      const res=p.status==='reserviert';
+      const items=[
+        ['Wohnfläche',p.wohnflaeche?p.wohnflaeche+' m²':null],
+        ['Grundstück',p.grundstueck?p.grundstueck+' m²':null],
+        ['Zimmer',p.zimmer],['Baujahr',p.baujahr],
+        ['Zustand',p.zustand],['Bäder',p.bad]
+      ].filter(x=>x[1]!=null&&x[1]!=='');
+      let specsHtml=items.map(x=>`<div class="sp"><div class="k">${x[0]}</div><div class="v">${esc(x[1])}</div></div>`).join('');
+      if(items.length%2!==0) specsHtml+='<div class="sp"></div>';
+      return `<div class="dcard">
+        <div class="head">
+          <span class="stamp ${res?'res':''}">${res?'Reserviert':'Verfügbar'}</span>
+          <div class="fileno">${fileNo(p)}</div>
+          <div class="type">${esc(p.immobilienart||'Immobilie')}${p.hausart?' · '+esc(p.hausart):''}</div>
+        </div>
+        <div class="body">
+          <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(p.plz||'')} ${esc(p.stadt||'')}</div>
+          <div class="specs">
+            ${specsHtml}
+          </div>
+          <button class="btn block" ${res?'disabled':''} onclick="openKontakt(${p.id})">${res?'Reserviert':'Kontakt anfragen'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){cards.innerHTML='<p style="color:var(--muted-on-light)">Objekte konnten nicht geladen werden. Bitte laden Sie die Seite neu.</p>';}
+}
+
+function openKontakt(id){currentProp=id;document.getElementById('kontaktMsg').className='msg';document.getElementById('modal-kontakt').classList.add('open');document.body.style.overflow='hidden';}
+function closeKontakt(){document.getElementById('modal-kontakt').classList.remove('open');document.body.style.overflow='';}
+document.getElementById('modal-kontakt').addEventListener('click',e=>{if(e.target.id==='modal-kontakt')closeKontakt();});
+document.getElementById('kontaktConfirm').addEventListener('click',async()=>{
+  const m=document.getElementById('kontaktMsg'),b=document.getElementById('kontaktConfirm');
+  b.disabled=true;b.textContent='Wird gesendet…';
+  try{
+    const r=await api('/api/contact-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:currentProp})});
+    if(r.ok){m.className='msg ok';m.textContent='Ihre Anfrage ist eingegangen. Wir melden uns zeitnah bei Ihnen.';}else throw new Error();
+  }catch(e){m.className='msg err';m.textContent='Fehler beim Senden. Bitte erneut versuchen.';}
+  finally{b.disabled=false;b.innerHTML='Anfrage absenden <span class="arr">→</span>';}
+});
+document.getElementById('logoutBtn').addEventListener('click',async()=>{await api('/api/logout',{method:'POST'});location.href='/';});
+document.getElementById('portalLink').addEventListener('click',async()=>{try{const d=await (await api('/api/portal')).json();if(d.url)location.href=d.url;}catch(e){}});
+init();
+</script>
+</body>
+</html>
